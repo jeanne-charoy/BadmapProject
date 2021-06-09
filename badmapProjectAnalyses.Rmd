@@ -1,0 +1,165 @@
+---
+title: "badmapProjectAnalyses"
+author: "Jeanne"
+date: "June 9, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##data wrangling packages (most part of the tidyverse)
+library(stringr)
+library(reshape2)
+library(ggplot2)##plotting
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(scales)
+library(modelbased)
+
+##analyses packages
+library(lmerTest)
+library(lme4)
+
+
+options(scipen=1, digits=3)
+
+```
+
+
+#Load the data
+
+##noun task and id task
+```{r}
+nounTask<-read.csv("exp1A_Nountask_masterFile.csv", header=TRUE, stringsAsFactors = FALSE)
+
+ddply(nounTask, .(Condition), summarize, NumSubjects = length(unique(Subject)))
+
+
+idTask<-read.csv("exp1A_idtask_masterFile.csv", header=TRUE, stringsAsFactors = FALSE)
+
+ddply(idTask, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+```
+
+
+#Data cleaning (eliminating outliers/bad performance participants)
+
+##Noun task performance
+```{r}
+
+nounTask_mean_bySubj <-aggregate(nounAnswer~grammarType+Condition+Subject, nounTask, FUN="mean")
+nouns_mean<-nounTask_mean_bySubj[nounTask_mean_bySubj$grammarType == "noun",]
+nonnouns_mean<-nounTask_mean_bySubj[nounTask_mean_bySubj$grammarType == "notNoun",]
+
+#poor performance participants based on accuracy on the task. 
+badSubjNouns <-nouns_mean$Subject[nouns_mean$nounAnswer<0.5]
+badSubjNotNouns <-nonnouns_mean$Subject[nonnouns_mean$nounAnswer>0.5]
+
+length(unique(c(badSubjNotNouns, badSubjNouns))) #8 participants were excluded based on this. 
+
+#poor performance participants based on rt results on the noun task. 
+nounTask_rtmean<-aggregate(rt~grammarType+Condition, nounTask, FUN="mean")
+nounTask_rtsd<-aggregate(rt~grammarType+Condition, nounTask, FUN="sd")
+nounTask_rtmean$sd<-nounTask_rtsd$rt
+nounTask_rtmean$sd2<-nounTask_rtmean$sd *2
+nounTask_rtmean$thresholdmax<-nounTask_rtmean$rt+nounTask_rtmean$sd2
+nounTask_rtmean$thresholdmin<-nounTask_rtmean$rt-nounTask_rtmean$sd2
+  
+nounTask_rtmean_bySubj <- aggregate(rt~grammarType+Condition+Subject, nounTask, FUN="mean")
+  
+##NOUNS
+nouns_meanrt<-nounTask_rtmean[nounTask_rtmean$grammarType == "noun",]
+names(nouns_meanrt)<-c("grammarType", "Condition","meanRT", "sd","sd2", "thresholdmax", "thresholdmin")
+nouns_mean_bySubj<-nounTask_rtmean_bySubj[nounTask_rtmean_bySubj$grammarType=="noun",]
+
+noun_rtAll<-merge(nouns_mean_bySubj, nouns_meanrt)
+
+##bad participants based on performance on noun items
+badSubjNounsRTmax<-noun_rtAll$Subject[noun_rtAll$rt>noun_rtAll$thresholdmax] #none
+badSubjNounsRTmin<-noun_rtAll$Subject[noun_rtAll$rt<noun_rtAll$thresholdmin] #none
+
+
+##NOT NOUNS
+notNouns_meanrt<-nounTask_rtmean[nounTask_rtmean$grammarType=="notNoun",]
+names(notNouns_meanrt)<-c("grammartype", "Condition","meanRT", "sd","sd2", "thresholdmax", "thresholdmin")
+notNouns_mean_bySubj<-nounTask_rtmean_bySubj[nounTask_rtmean_bySubj$grammarType=="notNoun",]
+
+notNoun_rtAll<-merge(notNouns_meanrt, notNouns_mean_bySubj)
+
+##bad participants based on performance on nont noun items
+badSubjNotNounsRTmax<-notNoun_rtAll$Subject[notNoun_rtAll$rt>notNoun_rtAll$thresholdmax] #none
+badSubjNotNounsRTmin<-notNoun_rtAll$Subject[notNoun_rtAll$rt<notNoun_rtAll$thresholdmin] #none
+
+
+##total bad participants based on performance on the noun task 
+badNNNSubj<-c(badSubjNouns,badSubjNotNouns,badSubjNounsRTmax,badSubjNounsRTmin,badSubjNotNounsRTmax,badSubjNotNounsRTmin)
+
+```
+
+##ID task performance
+```{r}
+meanPercentSH<-aggregate(sAnswer ~ audio + subject, idTask, FUN="mean")
+
+##measauring if the difference in sh answer between the first anad last step of the continuum is more than 50% (otherwise inndicating a relatively flat funciton, i.e., not doing the task right)
+
+goodIDcalc<-meanPercentSH[meanPercentSH$audio %in% c("asee_shstep05","asee_shstep17"),]
+
+goodIDcalcDiff<-spread(goodIDcalc, audio, sAnswer, fill = 0) %>%
+                transmute(subject, Diff = asee_shstep05-asee_shstep17)
+
+badSubjectID <- goodIDcalcDiff$subject[goodIDcalcDiff$Diff < 0.5]
+
+length(badSubjectID) ## 21 participants performed poorly on the task based on "accuracy"
+
+##RT results
+
+idtask_meanRT_bySubj <- aggregate(rt~ subject+condition, idTask, FUN="mean")
+idtask_meanRT<-aggregate(rt~condition, idTask, FUN="mean")
+idtask_sdRT<-aggregate(rt~condition, idTask, FUN="sd")
+
+idtask_meanRT$sd<-idtask_sdRT$rt
+idtask_meanRT$sd2<-idtask_meanRT$sd *2
+idtask_meanRT$thresholdmax<-idtask_meanRT$rt+idtask_meanRT$sd2
+idtask_meanRT$thresholdmin<-idtask_meanRT$rt-idtask_meanRT$sd2
+names(idtask_meanRT)<-c("condition","meanRT","sd","sd2","thresholdmax","thresholdmin")
+
+idtask_RT<-merge(idtask_meanRT_bySubj, idtask_meanRT)
+
+
+badSubjIDRTmin<-idtask_RT$subject[idtask_RT$rt>idtask_RT$thresholdmax]
+badSubjIDRTmax<-idtask_RT$subject[idtask_RT$rt<idtask_RT$thresholdmin]
+##No bad rt subject for id task either
+
+##total bad participants based on performance on the id task
+
+badIDSubj<-c(badSubjectID,badSubjIDRTmin,badSubjIDRTmax)
+
+```
+
+total participants excluded: 
+
+```{r}
+badSubjAll <- c(badNNNSubj,badIDSubj, "ABM06")
+```
+
+##Cleaned up data sets  
+
+```{r}
+nounTask_good<-nounTask[!nounTask$Subject %in% badSubjAll,]
+ddply(nounTask_good, .(Condition), summarize, NumSubjects = length(unique(Subject)))
+
+idTask_good<-idTask[!idTask$subject %in% badSubjAll,]
+ddply(idTask_good, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+##eliminating trials where RTs were higher than 5000ms or lower than 200ms
+nounTask_good<-nounTask_good[!nounTask_good$rt > 5000,]
+nounTask_good<-nounTask_good[!nounTask_good$rt <200,]
+
+idTask_good<-idTask_good[!idTask_good$rt > 5000,]
+idTask_good<-idTask_good[!idTask_good$rt < 200,]
+
+```
+
