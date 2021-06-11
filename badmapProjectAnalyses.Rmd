@@ -135,24 +135,24 @@ badSubjIDRTmax<-idtask_RT$subject[idtask_RT$rt<idtask_RT$thresholdmin]
 
 ##total bad participants based on performance on the id task
 
-badIDSubj<-c(badSubjectID,badSubjIDRTmin,badSubjIDRTmax)
+badIDSubj<-unique(c(badSubjectID,badSubjIDRTmin,badSubjIDRTmax))
 
 ```
 
 total participants excluded: 
 
 ```{r}
-badSubjAll <- c(badNNNSubj,badIDSubj, "ABM06")
+badSubjAll <- unique(c(badNNNSubj,badIDSubj, "ABM06"))
 ```
 
 ##Cleaned up data sets  
 
 ```{r}
 nounTask_good<-nounTask[!nounTask$Subject %in% badSubjAll,]
-ddply(nounTask_good, .(Condition), summarize, NumSubjects = length(unique(Subject)))
+sampleSize_NT<-ddply(nounTask_good, .(Condition), summarize, NumSubjects = length(unique(Subject)))
 
 idTask_good<-idTask[!idTask$subject %in% badSubjAll,]
-ddply(idTask_good, .(condition), summarize, NumSubjects = length(unique(subject)))
+sampleSize_ID<-ddply(idTask_good, .(condition), summarize, NumSubjects = length(unique(subject)))
 
 ##eliminating trials where RTs were higher than 5000ms or lower than 200ms
 nounTask_good<-nounTask_good[!nounTask_good$rt > 5000,]
@@ -163,3 +163,96 @@ idTask_good<-idTask_good[!idTask_good$rt < 200,]
 
 ```
 
+#MEAN,PLOTS AND ANALYSES OF THE NOUN TASK RESULTS
+
+##Accuracy for noun not noun
+the fixed factors are: Condition, trial, grammar type (?)
+random factors: subjects, words (items), trial, word type (filler vs critical)
+
+```{r, echo=FALSE}
+#mean 
+nounTaskgd_mean <- aggregate(accuracy~wordType+Condition, nounTask_good, FUN="mean")
+nounTaskgd_sd<- aggregate(accuracy~wordType+Condition, nounTask_good, FUN="sd")
+nounTaskgd_mean$sd<-nounTaskgd_sd$accuracy
+
+nounTaskgd_all<-merge(sampleSize_NT, nounTaskgd_mean)
+nounTaskgd_all$sem<-nounTaskgd_all$sd/sqrt(nounTaskgd_all$NumSubjects)
+
+#---------------------------------------------------------------------------------------#
+aggregate(accuracy~wordType, nounTask_good, FUN="mean")
+```
+
+
+```{r}
+#plot
+ggplot(nounTaskgd_all, aes(wordType, accuracy))+
+  geom_bar(stat = "identity", position="dodge", aes(fill=Condition))+
+  geom_errorbar(aes(ymin=accuracy-sem, ymax=accuracy+sem, shape=Condition), width=.2,size=1, position=position_dodge(.9))+
+  #geom_point(data = NNNRes_goodSubj, position =position_jitterdodge(jitter.width = 0,jitter.height = 0,dodge.width = .9), aes(x = type, y = Button.Pressed, shape = Condition),alpha=.3, size=2)+
+  scale_fill_manual(values=c("#005a9c","#bf2c37","#008061","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
+    scale_shape_discrete(labels=c("Early Ambiguous","Early Bad Map", "Late Ambiguous", "Late Bad Map"))+
+  ylab("Accuracy")+
+  xlab("Word type")+
+  ylim(0,1)+
+  theme_minimal(base_size = 20)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        text = element_text(family="Arial"),
+        legend.position="right",
+        axis.text.x = element_text(size=16),
+        axis.text.y = element_text(size=16),
+        plot.title = element_text(size=16))
+
+#dev.off()
+
+```
+
+```{r, echo=FALSE}
+
+##ANALYSES 
+str(nounTask_good)
+nounTask_good$Subject<-factor(nounTask_good$Subject)
+nounTask_good$Condition<-factor(nounTask_good$Condition)
+nounTask_good$wordType<-factor(nounTask_good$wordType)
+nounTask_good$grammarType<-factor(nounTask_good$grammarType)
+
+
+#accuracy not normal - binomial
+
+##this is overall accuracy  (including nouns and non nouns)
+##didn't converge with  a slope for wordtype
+##DOESN"T CONVERGE"
+#accuracyNNNexp1_model1<-glmer(accuracy~Condition*wordType+ Condition*grammarType+scale(trial)+(1+scale(trial)|word)+(1+wordType+grammarType+scale(trial)|Subject), family = "binomial", nounTask_good,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+#accuracyNNNexp1_model2<-glmer(accuracy~Condition*wordType+ Condition*grammarType+scale(trial)+(1|word)+(1+wordType+grammarType|Subject), family = "binomial", nounTask_good,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+#accuracyNNNexp1_model3<-glmer(accuracy~Condition*wordType+grammarType+scale(trial)+(1|word)+(1+wordType+grammarType|Subject), family = "binomial", nounTask_good,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+accuracyNNNexp1_model4<-glmer(accuracy~Condition*wordType+grammarType+scale(trial)+(1|word)+(1+wordType|Subject), family = "binomial", nounTask_good,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+
+accuracyNNNexp1_model5<-glmer(accuracy~Condition+wordType+grammarType+scale(trial)+(1|word)+(1+wordType|Subject), family = "binomial", nounTask_good,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+
+anova(accuracyNNNexp1_model4, accuracyNNNexp1_model5)
+##interaction doesn't add to the model
+
+
+summary(accuracyNNNexp1_model5)
+
+
+nounTask_goodRLVL<-nounTask_good
+
+nounTask_goodRLVL <- nounTask_good %>%
+  mutate(Condition = relevel(Condition, ref = "BAM"))
+
+
+accuracyNNNexp1_model5.bis<-glmer(accuracy~Condition+wordType+grammarType+scale(trial)+(1|word)+(1+wordType|Subject), family = "binomial", nounTask_goodRLVL,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(accuracyNNNexp1_model5.bis)
+
+
+accuracyNNNexp1_model6<-glmer(accuracy~wordType+grammarType+scale(trial)+(1|word)+(1+wordType|Subject), family = "binomial", nounTask_goodRLVL,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+##no differences between conditions. no differences for filler or grammar type. 
+
+anova(accuracyNNNexp1_model5.bis, accuracyNNNexp1_model6)
+```
