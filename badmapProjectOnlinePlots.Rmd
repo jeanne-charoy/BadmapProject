@@ -1,0 +1,374 @@
+---
+title: "badmapProjectOnlinePlots"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##data wrangling packages (most part of the tidyverse)
+library(stringr)
+library(reshape2)
+library(ggplot2)##plotting
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(scales)
+library(modelbased)
+
+#fonts
+library(extrafont)
+#font_import()
+loadfonts(device = "win")
+
+
+
+
+##analyses packages
+library(lmerTest)
+library(lme4)
+
+
+options(scipen=1, digits=3)
+
+```
+
+#Load the data
+
+##noun task, id task, baseline
+```{r}
+##NOUN TASK DATA
+nounTask_Online<-read.csv("exp1Online_NNNRes.csv", header=TRUE, stringsAsFactors = FALSE)
+
+ddply(nounTask_Online, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+##ID TASK DATA
+idTask_Online<-read.csv("exp1Online_IDTaskRes.csv", header=TRUE, stringsAsFactors = FALSE)
+
+ddply(idTask_Online, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+##BASELINE DATA
+baselineTask_Online<-read.csv("exp1Online_BaselineRes.csv", header=TRUE, stringsAsFactors = FALSE)
+
+ddply(baselineTask_Online, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+
+allIDtaskres<-(rbind(idTask_Online, baselineTask_Online))
+```
+
+
+##First going through the exclusion criteria based on characteristics of the participants (language background, audio equipment etc...)
+
+```{r}
+#####Did they report being normal of hearing or corrected to normal?#############################
+
+##### EXPERIMENTAL GROUP
+
+allIDtaskresHearing<-allIDtaskres$subject[allIDtaskres$hearing=="no"]
+
+length(unique(allIDtaskresHearing)) ## 2 subjects excluded based on this
+
+
+
+##Did they report English as part of their native language? 
+
+allIDtaskresEnglish<-allIDtaskres$subject[!allIDtaskres$lang %in% c("english","biling")]
+
+length(unique(allIDtaskresEnglish)) ## 104  subjects excluded based on this
+
+
+##Did they report using headphones or earphones to complete the study
+
+allIDtaskres_headphones<-allIDtaskres$subject[allIDtaskres$equip %in% c("Laptop/pc speakers","External speakers (cost $30 or less)", "External speakers (cost between $30 and $100)","External speakers (cost more than $100)")]
+
+length(unique(allIDtaskres_headphones)) ## 198  subjects excluded based on this
+
+
+#total bad subjects based on these
+
+allBadCharacterisitcs<-unique(c(allIDtaskresHearing,allIDtaskresEnglish,allIDtaskres_headphones))
+
+length(allBadCharacterisitcs) #250 for experimental + baseline data
+
+nounTask_OnlineGd1<-nounTask_Online[!nounTask_Online$subject %in% allBadCharacterisitcs,]
+idTask_OnlineGd1<-allIDtaskres[!allIDtaskres$subject %in% allBadCharacterisitcs,]
+
+ddply(nounTask_OnlineGd1, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+ddply(idTask_OnlineGd1, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+
+```
+
+
+##Cleaning data continued - excluding subjects based on task performance.  
+###First, the Noun task  
+Participants were excluded if they had less than 50% accuracy on the nouns and/or non nouns, or if their average RTs were +/- 2 sd from their group's mean
+
+```{r, echo=FALSE}
+#bad subjects based on Noun-not noun task. 
+
+##mean for noun/not noun task (as a function of grammatical type and condition)
+nnnMean<-aggregate(nounAnswer~wordType+subject+condition, nounTask_OnlineGd1, FUN="mean" )
+
+##eliminating subjects who answered "not noun" more than 50% of the time for noun items
+nnn_MeanNoun<-nnnMean[nnnMean$wordType == "noun",]
+
+badNoun_subj<-as.character(nnn_MeanNoun$subject[nnn_MeanNoun$nounAnswer<0.50]) 
+
+##eliminating subejcts who answered "noun" more than 50% of the time for non noun items
+nnn_MeanNotNoun<-nnnMean[nnnMean$wordType == "notnoun",]
+badNotNoun_subj<-as.character(nnn_MeanNotNoun$subject[nnn_MeanNotNoun$nounAnswer>0.50])
+
+
+##based on RTs.  
+
+nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt >5000,]
+nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt <200,]
+
+
+nnnMean_RT<-aggregate(rt~wordType+subject+condition, nounTask_OnlineGd1, FUN="mean" )
+
+nnnAllMean_RT<-aggregate(rt~wordType+condition, nounTask_OnlineGd1, FUN="mean" )
+nnnSD_RT<-aggregate(rt~wordType+condition, nounTask_OnlineGd1, FUN="sd" )
+
+nnn_MeanNounRT<-nnnMean_RT[nnnMean_RT$wordType == "noun",]
+nnn_SDNounRT<-nnnSD_RT[nnnSD_RT$wordType == "noun",]
+nnn_MeanAllNounRT <- nnnAllMean_RT[nnnAllMean_RT$wordType == "noun",]
+nnn_MeanAllNounRT$sd2<-2*(nnn_SDNounRT$rt)
+
+nnn_MeanAllNounRT$maxThreshold<-nnn_MeanAllNounRT$rt + nnn_MeanAllNounRT$sd2
+
+###non nouns
+
+
+nnn_MeanNonNounRT<-nnnMean_RT[nnnMean_RT$wordType == "notnoun",]
+nnn_SDNonNounRT<-nnnSD_RT[nnnSD_RT$wordType == "notnoun",]
+nnn_MeanAllNonNounRT <- nnnAllMean_RT[nnnAllMean_RT$wordType == "notnoun",]
+nnn_MeanAllNonNounRT$sd2<-2*(nnn_SDNonNounRT$rt)
+
+nnn_MeanAllNonNounRT$maxThreshold<-nnn_MeanAllNonNounRT$rt + nnn_MeanAllNonNounRT$sd2 
+
+meanAllthreshold<-rbind(nnn_MeanAllNounRT, nnn_MeanAllNonNounRT)
+names(meanAllthreshold)<-c("wordType","condition","meanGroupRT","sd2","maxThresh")
+
+nnnMean_RTCheck<-merge(nnnMean_RT,meanAllthreshold)
+
+badSubjeRT<-nnnMean_RTCheck$subject[nnnMean_RTCheck$rt>nnnMean_RTCheck$maxThresh] ## no bad subjects here. 
+
+######################################
+##all bad subj in NNN task
+badSubjectNountask<-c(badNoun_subj,badNotNoun_subj,badSubjeRT)
+
+
+```
+
+###id task
+```{r, echo=FALSE}
+##bad subject based on ID task
+
+##ID TASK
+
+##mean S answer on the different steps for each condition and each subject
+idMean<-aggregate(SAnswer~step+subject+condition, idTask_OnlineGd1, FUN="mean" )
+
+#without condition
+idMeanSubj<-aggregate(SAnswer~step+subject, idTask_OnlineGd1, FUN="mean" )
+goodIDcalc<-idMeanSubj[idMeanSubj$step %in% c("step05","step17"),]
+
+goodIDcalcDiff<-spread(goodIDcalc, step, SAnswer, fill = 0) %>%
+                transmute(subject, Diff = step05-step17)
+
+badSubjectIDT <- goodIDcalcDiff$subject[goodIDcalcDiff$Diff <= 0.5]
+
+exp1ID_step1<-idTask_OnlineGd1[idTask_OnlineGd1$step == "step05",]
+exp1ID_step1Mean<-aggregate(SAnswer~subject, exp1ID_step1, FUN="mean")
+exp1ID_step1_badsubj<-exp1ID_step1Mean$subject[exp1ID_step1Mean$SAnswer<=0.70]
+
+
+##Rts
+idTask_OnlineGd1<-idTask_OnlineGd1[!idTask_OnlineGd1$rt>5000,]
+idTask_OnlineGd1<-idTask_OnlineGd1[!idTask_OnlineGd1$rt<200,]
+
+
+idMeanRT<-aggregate(rt~subject+condition, idTask_OnlineGd1, FUN="mean" )
+idMeanRTAll<-aggregate(rt~condition, idTask_OnlineGd1, FUN="mean" )
+idSDRTAll<-aggregate(rt~condition, idTask_OnlineGd1, FUN="sd" )
+
+idMeanRTAll$sd<-idSDRTAll$rt
+idMeanRTAll$sd2<-2*idMeanRTAll$sd
+idMeanRTAll$thresholdmax<-idMeanRTAll$rt+idMeanRTAll$sd2
+idMeanRTAll$thresholdmin<-idMeanRTAll$rt-idMeanRTAll$sd2
+
+names(idMeanRTAll)<-c("NNNcondition","mean","sd","sd2","thresholdmax","thresholdmin")
+
+idMeanRT<-merge(idMeanRT, idMeanRTAll)
+
+idbadsubjectRT<-idMeanRT$subject[idMeanRT$rt>idMeanRT$thresholdmax] ## one subject
+
+badSubjectID<-c(badSubjectIDT,exp1ID_step1_badsubj, idbadsubjectRT)
+##also eliminating people who answer S less than 50% of teh time on step05 (i.e. the first step)
+
+```
+
+
+
+```{r}
+##all bad subjects 
+
+badSubjectExp1Online<-c(badSubjectNountask,badSubjectID)
+
+nounTask_OnlineGdFinal<-nounTask_OnlineGd1[!nounTask_OnlineGd1$subject %in% badSubjectExp1Online,]
+idTask_OnlineGdFinal<-idTask_OnlineGd1[!idTask_OnlineGd1$subject %in% badSubjectExp1Online,]
+
+
+ddply(nounTask_OnlineGdFinal, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+sampleSize<-ddply(idTask_OnlineGdFinal, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+sampleSize
+```
+
+
+
+##FIGURES: 
+
+###NOUN NOT NOUN:  
+
+
+```{r, echo=FALSE}
+
+nnnMean_final<- aggregate(nounAnswer~wordType+subject+condition,nounTask_OnlineGdFinal, FUN="mean")
+nnnMean_final_group<- aggregate(nounAnswer~wordType+condition,nounTask_OnlineGdFinal, FUN="mean")
+
+
+ggplot(nnnMean_final_group, aes(wordType, nounAnswer))+
+  geom_bar(stat = "identity", position="dodge", aes(fill=condition))+
+#  geom_errorbar(aes(ymin=Button.Pressed-sem, ymax=Button.Pressed+sem, shape=Condition), width=.2,size=1, position=position_dodge(.9))+
+  geom_point(data = nnnMean_final, position =position_jitterdodge(jitter.width = 0,jitter.height = 0,dodge.width = .9), aes(x = wordType, y = nounAnswer, shape = condition),alpha=.3, size=2)+
+  scale_fill_manual(values=c("#005a9c","#bf2c37","#008061","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
+    scale_shape_discrete(labels=c("Early Ambiguous","Early Bad Map", "Late Ambiguous", "Late Bad Map"))+
+  ylab("Percent 'NOUN' answer")+
+  xlab("Word type")+
+  ylim(0,1)+
+  theme_minimal(base_size = 20)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        text = element_text(family="Arial"),
+        legend.position="right",
+        axis.text.x = element_text(size=16),
+        axis.text.y = element_text(size=16),
+        plot.title = element_text(size=16))
+
+```
+
+```{r}
+
+SHres <- aggregate(SAnswer~step+condition, idTask_OnlineGdFinal, FUN="mean")
+
+SHres_sd<-aggregate(SAnswer~step+condition, idTask_OnlineGdFinal, FUN="sd")
+
+SHres$sd<-SHres_sd$SAnswer
+
+idAverage<-merge(sampleSize, SHres)
+
+idAverage$sem<-idAverage$sd/sqrt(idAverage$NumSubjects)
+
+idAverage$conditionType[idAverage$condition %in% c("aam","bam","baseline")]<-"Ambiguous Conditions"
+idAverage$conditionType[idAverage$condition %in% c("abm","bbm")]<-"Bad Map Conditions"
+
+idAverage$step<-factor(idAverage$step)
+
+ggplot(idAverage, aes(step, SAnswer))+
+  geom_line(aes(color=condition, group = condition), size=1)+
+      geom_errorbar(data=idAverage,aes(ymin=SAnswer-sem,ymax=SAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
+  ylab("Percent 'S' answer")+
+  xlab("Steps (from more S to more SH)")+
+    scale_color_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#001f23","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Baseline","Late Bad Map"))+
+      theme_minimal(base_size = 14)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        plot.title = element_text(size=12),
+        text = element_text(family="Times New Roman"))+
+  guides(linetype=FALSE)
+
+```
+
+##EARLY PASSES
+
+```{r}
+idTask_OnlineGdFinalEARLY<-idTask_OnlineGdFinal[idTask_OnlineGdFinal$phase %in% c("Early"),]
+
+SHresERL <- aggregate(SAnswer~step+condition, idTask_OnlineGdFinalEARLY, FUN="mean")
+
+SHresERL_sd<-aggregate(SAnswer~step+condition, idTask_OnlineGdFinalEARLY, FUN="sd")
+
+SHresERL$sd<-SHresERL_sd$SAnswer
+
+idAverageERL<-merge(sampleSize, SHresERL)
+
+idAverageERL$sem<-idAverageERL$sd/sqrt(idAverageERL$NumSubjects)
+
+idAverageERL$conditionType[idAverageERL$condition %in% c("aam","bam","baseline")]<-"Ambiguous Conditions"
+idAverageERL$conditionType[idAverageERL$condition %in% c("abm","bbm")]<-"Bad Map Conditions"
+
+idAverageERL$step<-factor(idAverageERL$step)
+
+ggplot(idAverageERL, aes(step, SAnswer))+
+  geom_line(aes(color=condition, group = condition), size=1)+
+      geom_errorbar(data=idAverageERL,aes(ymin=SAnswer-sem,ymax=SAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
+  ylab("Percent 'S' answer")+
+  xlab("Steps (from more S to more SH)")+
+    scale_color_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#001f23","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Baseline","Late Bad Map"))+
+      theme_minimal(base_size = 14)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        plot.title = element_text(size=12),
+        text = element_text(family="Times New Roman"))+
+  guides(linetype=FALSE)
+
+```
+
+##LATE PASSES
+
+```{r}
+idTask_OnlineGdFinalLATE<-idTask_OnlineGdFinal[idTask_OnlineGdFinal$phase %in% c("Late"),]
+
+SHresLT <- aggregate(SAnswer~step+condition, idTask_OnlineGdFinalLATE, FUN="mean")
+
+SHresLT_sd<-aggregate(SAnswer~step+condition, idTask_OnlineGdFinalLATE, FUN="sd")
+
+SHresLT$sd<-SHresLT_sd$SAnswer
+
+idAverageLT<-merge(sampleSize, SHresLT)
+
+idAverageLT$sem<-idAverageLT$sd/sqrt(idAverageLT$NumSubjects)
+
+idAverageLT$conditionType[idAverageLT$condition %in% c("aam","bam","baseline")]<-"Ambiguous Conditions"
+idAverageLT$conditionType[idAverageLT$condition %in% c("abm","bbm")]<-"Bad Map Conditions"
+
+idAverageLT$step<-factor(idAverageLT$step)
+
+ggplot(idAverageLT, aes(step, SAnswer))+
+  geom_line(aes(color=condition, group = condition), size=1)+
+      geom_errorbar(data=idAverageERL,aes(ymin=SAnswer-sem,ymax=SAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
+  ylab("Percent 'S' answer")+
+  xlab("Steps (from more S to more SH)")+
+    scale_color_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#001f23","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Baseline","Late Bad Map"))+
+      theme_minimal(base_size = 14)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        plot.title = element_text(size=12),
+        text = element_text(family="Times New Roman"))+
+  guides(linetype=FALSE)
+
+```
