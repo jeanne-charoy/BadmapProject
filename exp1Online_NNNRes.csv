@@ -1,4 +1,4 @@
-subject,id,condition,word,trial,nounAnswer,rt,wordType,type,sex,hearing,lang,equip
+subject,id,condition,word,trial,nounAnswer,rt,grammarType,wordType,sex,hearing,lang,equip
 Subject001,1010subject156,bam,family,1,1,1336,noun,filler,Male,yes,english,In-ear headphones/earbuds (cost more than $100)
 Subject001,1010subject156,bam,yell,10,0,1372,notnoun,filler,Male,yes,english,In-ear headphones/earbuds (cost more than $100)
 Subject001,1010subject156,bam,hidden,11,0,2605,notnoun,filler,Male,yes,english,In-ear headphones/earbuds (cost more than $100)
