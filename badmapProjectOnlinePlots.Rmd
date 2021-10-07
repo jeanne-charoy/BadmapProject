@@ -94,10 +94,13 @@ idAverage<-merge(sampleSize, SHres)
 
 idAverage$sem<-idAverage$sd/sqrt(idAverage$NumSubjects)
 
-idAverage$conditionType[idAverage$condition %in% c("aam","bam","baseline")]<-"Ambiguous Conditions"
-idAverage$conditionType[idAverage$condition %in% c("abm","bbm")]<-"Bad Map Conditions"
+idAverage$conditionType[idAverage$condition %in% c("aam","bam")]<-"Ambiguous Conditions"
+idAverage$conditionType[idAverage$condition %in% c("abm","bbm","baseline")]<-"Bad Map Conditions"
 
 idAverage$step<-factor(idAverage$step)
+
+png("Exp1Online2.png", units="in", width=12, height=6, res=300)
+
 
 ggplot(idAverage, aes(step, SAnswer))+
   geom_line(aes(color=condition, group = condition), size=1)+
@@ -113,7 +116,11 @@ ggplot(idAverage, aes(step, SAnswer))+
         axis.text.y = element_text(size=12),
         plot.title = element_text(size=12),
         text = element_text(family="Times New Roman"))+
-  guides(linetype=FALSE)
+        guides(linetype=FALSE)+
+        facet_wrap(~conditionType)
+
+dev.off()
+
 
 ```
 
@@ -132,10 +139,13 @@ idAverageERL<-merge(sampleSize, SHresERL)
 
 idAverageERL$sem<-idAverageERL$sd/sqrt(idAverageERL$NumSubjects)
 
-idAverageERL$conditionType[idAverageERL$condition %in% c("aam","bam","baseline")]<-"Ambiguous Conditions"
-idAverageERL$conditionType[idAverageERL$condition %in% c("abm","bbm")]<-"Bad Map Conditions"
+idAverageERL$conditionType[idAverageERL$condition %in% c("aam","bam")]<-"Ambiguous Conditions"
+idAverageERL$conditionType[idAverageERL$condition %in% c("abm","bbm","baseline")]<-"Bad Map Conditions"
 
 idAverageERL$step<-factor(idAverageERL$step)
+
+png("earlyAmbigExp1OnlineEARLY2.png", units="in", width=12, height=6, res=300)
+
 
 ggplot(idAverageERL, aes(step, SAnswer))+
   geom_line(aes(color=condition, group = condition), size=1)+
@@ -151,7 +161,10 @@ ggplot(idAverageERL, aes(step, SAnswer))+
         axis.text.y = element_text(size=12),
         plot.title = element_text(size=12),
         text = element_text(family="Times New Roman"))+
-  guides(linetype=FALSE)
+  guides(linetype=FALSE)+
+  facet_wrap(~conditionType)
+
+dev.off()
 
 ```
 
@@ -170,14 +183,17 @@ idAverageLT<-merge(sampleSize, SHresLT)
 
 idAverageLT$sem<-idAverageLT$sd/sqrt(idAverageLT$NumSubjects)
 
-idAverageLT$conditionType[idAverageLT$condition %in% c("aam","bam","baseline")]<-"Ambiguous Conditions"
-idAverageLT$conditionType[idAverageLT$condition %in% c("abm","bbm")]<-"Bad Map Conditions"
+idAverageLT$conditionType[idAverageLT$condition %in% c("aam","bam")]<-"Ambiguous Conditions"
+idAverageLT$conditionType[idAverageLT$condition %in% c("abm","bbm","baseline")]<-"Bad Map Conditions"
 
 idAverageLT$step<-factor(idAverageLT$step)
 
+png("Exp1OnlineLATE2.png", units="in", width=12, height=6, res=300)
+
+
 ggplot(idAverageLT, aes(step, SAnswer))+
   geom_line(aes(color=condition, group = condition), size=1)+
-      geom_errorbar(data=idAverageERL,aes(ymin=SAnswer-sem,ymax=SAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
+      geom_errorbar(data=idAverageLT,aes(ymin=SAnswer-sem,ymax=SAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
   ylab("Percent 'S' answer")+
   xlab("Steps (from more S to more SH)")+
     scale_color_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#001f23","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Baseline","Late Bad Map"))+
@@ -189,6 +205,11 @@ ggplot(idAverageLT, aes(step, SAnswer))+
         axis.text.y = element_text(size=12),
         plot.title = element_text(size=12),
         text = element_text(family="Times New Roman"))+
-  guides(linetype=FALSE)
+  guides(linetype=FALSE)+
+    facet_wrap(~conditionType)
+
+
+dev.off()
+
 
 ```

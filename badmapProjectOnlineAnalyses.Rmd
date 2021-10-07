@@ -43,10 +43,12 @@ ddply(idTask_Online, .(condition), summarize, NumSubjects = length(unique(subjec
 ##BASELINE DATA
 baselineTask_Online<-read.csv("exp1Online_BaselineRes.csv", header=TRUE, stringsAsFactors = FALSE)
 
-ddply(baselineTask_Online, .(condition), summarize, NumSubjects = length(unique(subject)))
 
 
 allIDtaskres<-(rbind(idTask_Online, baselineTask_Online))
+
+ddply(allIDtaskres, .(condition), summarize, NumSubjects = length(unique(subject)))
+
 ```
 
 
@@ -68,6 +70,8 @@ length(unique(allIDtaskresHearing)) ## 2 subjects excluded based on this
 allIDtaskresEnglish<-allIDtaskres$subject[!allIDtaskres$lang %in% c("english","biling")]
 
 length(unique(allIDtaskresEnglish)) ## 104  subjects excluded based on this
+
+#length(setdiff(allIDtaskresEnglish,allIDtaskresHearing))
 
 
 ##Did they report using headphones or earphones to complete the study
@@ -102,15 +106,15 @@ Participants were excluded if they had less than 50% accuracy on the nouns and/o
 #bad subjects based on Noun-not noun task. 
 
 ##mean for noun/not noun task (as a function of grammatical type and condition)
-nnnMean<-aggregate(nounAnswer~wordType+subject+condition, nounTask_OnlineGd1, FUN="mean" )
+nnnMean<-aggregate(nounAnswer~grammarType+subject+condition, nounTask_OnlineGd1, FUN="mean" )
 
 ##eliminating subjects who answered "not noun" more than 50% of the time for noun items
-nnn_MeanNoun<-nnnMean[nnnMean$wordType == "noun",]
+nnn_MeanNoun<-nnnMean[nnnMean$grammarType == "noun",]
 
 badNoun_subj<-as.character(nnn_MeanNoun$subject[nnn_MeanNoun$nounAnswer<0.50]) 
 
 ##eliminating subejcts who answered "noun" more than 50% of the time for non noun items
-nnn_MeanNotNoun<-nnnMean[nnnMean$wordType == "notnoun",]
+nnn_MeanNotNoun<-nnnMean[nnnMean$grammarType == "notnoun",]
 badNotNoun_subj<-as.character(nnn_MeanNotNoun$subject[nnn_MeanNotNoun$nounAnswer>0.50])
 
 
@@ -120,14 +124,14 @@ nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt >5000,]
 nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt <200,]
 
 
-nnnMean_RT<-aggregate(rt~wordType+subject+condition, nounTask_OnlineGd1, FUN="mean" )
+nnnMean_RT<-aggregate(rt~grammarType+subject+condition, nounTask_OnlineGd1, FUN="mean" )
 
-nnnAllMean_RT<-aggregate(rt~wordType+condition, nounTask_OnlineGd1, FUN="mean" )
-nnnSD_RT<-aggregate(rt~wordType+condition, nounTask_OnlineGd1, FUN="sd" )
+nnnAllMean_RT<-aggregate(rt~grammarType+condition, nounTask_OnlineGd1, FUN="mean" )
+nnnSD_RT<-aggregate(rt~grammarType+condition, nounTask_OnlineGd1, FUN="sd" )
 
-nnn_MeanNounRT<-nnnMean_RT[nnnMean_RT$wordType == "noun",]
-nnn_SDNounRT<-nnnSD_RT[nnnSD_RT$wordType == "noun",]
-nnn_MeanAllNounRT <- nnnAllMean_RT[nnnAllMean_RT$wordType == "noun",]
+nnn_MeanNounRT<-nnnMean_RT[nnnMean_RT$grammarType == "noun",]
+nnn_SDNounRT<-nnnSD_RT[nnnSD_RT$grammarType == "noun",]
+nnn_MeanAllNounRT <- nnnAllMean_RT[nnnAllMean_RT$grammarType == "noun",]
 nnn_MeanAllNounRT$sd2<-2*(nnn_SDNounRT$rt)
 
 nnn_MeanAllNounRT$maxThreshold<-nnn_MeanAllNounRT$rt + nnn_MeanAllNounRT$sd2
@@ -209,7 +213,9 @@ badSubjectID<-c(badSubjectIDT,exp1ID_step1_badsubj, idbadsubjectRT)
 ```{r}
 ##all bad subjects 
 
-badSubjectExp1Online<-c(badSubjectNountask,badSubjectID)
+badSubjectExp1Online<-unique(c(badSubjectNountask,badSubjectID))
+
+length(badSubjectExp1Online)
 
 nounTask_OnlineGdFinal<-nounTask_OnlineGd1[!nounTask_OnlineGd1$subject %in% badSubjectExp1Online,]
 idTask_OnlineGdFinal<-idTask_OnlineGd1[!idTask_OnlineGd1$subject %in% badSubjectExp1Online,]
@@ -248,6 +254,10 @@ nounTaskOnlinegd_mean$sem<-nounTaskOnlinegd_mean$sd/sqrt(nounTaskOnlinegd_mean$N
 
 #---------------------------------------------------------------------------------------#
 aggregate(accuracy~grammarType, nounTask_OnlineGdFinal, FUN="mean")
+aggregate(accuracy~wordType, nounTask_OnlineGdFinal, FUN="mean")
+
+mean(nounTask_OnlineGdFinal$accuracy)
+
 ```
 
 
@@ -307,6 +317,10 @@ accuracyNNNexp1Online_model2.bis<-glmer(accuracy~condition+wordType+grammarType+
 
 summary(accuracyNNNexp1Online_model2.bis)
 
+accuracyNNNexp1Online_model3<-glmer(accuracy~wordType+grammarType+scale(trial)+(1|word)+(1+wordType|subject), family = "binomial", nounTask_OnlineGdFinalRLVL,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+anova(accuracyNNNexp1Online_model2.bis, accuracyNNNexp1Online_model3)
+
 ```
 
 
@@ -322,6 +336,8 @@ idOnlineTask_gdSD<- aggregate(SAnswer~condition, idTask_OnlineGdFinal, FUN="sd")
 #---------------EARLY AND LATE REPETITIONS------------------------------------------------------------------------#
 
 aggregate(SAnswer~condition+phase, idTask_OnlineGdFinal, FUN="mean")
+
+aggregate(SAnswer~condition, idTask_OnlineGdFinal, FUN="mean")
 
 
 #---------------------------------------------------------------------------------------#
