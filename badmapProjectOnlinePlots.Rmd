@@ -213,3 +213,47 @@ dev.off()
 
 
 ```
+
+
+```{r}
+
+##plots for psychonomics' 
+
+idAverageERL$conditionType[idAverageERL$condition %in% c("bam")]<-"a"
+idAverageERL$conditionType[idAverageERL$condition %in% c("aam")]<-"b"
+idAverageERL$conditionType[idAverageERL$condition %in% c("bbm","baseline")]<-"c"
+idAverageERL$conditionType[idAverageERL$condition %in% c("abm")]<-"d"
+
+idAverageERLtemp<-idAverageERL
+
+supp.labs <- c("Late Ambiguous", "Early Ambiguous", "Late Bad Map", "Early Bad Map")
+names(supp.labs) <- c("a", "b","c","d")
+
+
+png("psychoOnlineLB.png", units="in", width=6, height=6, res=300)
+
+
+ggplot(idAverageERLtemp, aes(step, SAnswer))+
+  geom_line(aes(color=condition, group = condition), size=1)+
+      geom_errorbar(data=idAverageERLtemp,aes(ymin=SAnswer-sem,ymax=SAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
+  ylab("Percent 'S' answer")+
+  xlab("Steps (from more S to more SH)")+
+   scale_color_manual(values=c("#94D2BD","#005F73","#CA6702","#001219","#9B2226"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Baseline","Late Bad Map"))+
+     # scale_color_manual(values=c("#94D2BD","#005F73","#CA6702","#9B2226","#001219"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map","Baseline"))+
+      theme_minimal(base_size = 16)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=14),
+        axis.text.y = element_text(size=14),
+        plot.title = element_text(size=14),
+        text = element_text(family="Arial"),
+        panel.background = element_rect(fill="#FBF8EF", colour="#FBF8EF"),
+        plot.background = element_rect(fill = "#FBF8EF"),
+        panel.border = element_blank())+
+  guides(linetype=FALSE, color=FALSE)+
+  facet_wrap(~conditionType,labeller = labeller(conditionType = supp.labs))
+
+dev.off()
+```
+

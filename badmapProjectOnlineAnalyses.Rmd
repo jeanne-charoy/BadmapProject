@@ -414,6 +414,8 @@ summary(modelOnlineLate)
 ##Interaction analyses
 ```{r}
 
+
+
 idOnlineTask_good_noFinalSteps$pronunciation[idOnlineTask_good_noFinalSteps$condition %in% c("aam","bam")]<-"ambiguous"
 idOnlineTask_good_noFinalSteps$pronunciation[idOnlineTask_good_noFinalSteps$condition %in% c("abm","bbm")]<-"badmap"
 idOnlineTask_good_noFinalSteps$pronunciation[idOnlineTask_good_noFinalSteps$condition %in% c("baseline")]<-"none"

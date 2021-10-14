@@ -1,0 +1,200 @@
+---
+title: "crossExperimentAnalyses"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##data wrangling packages (most part of the tidyverse)
+library(stringr)
+library(reshape2)
+library(ggplot2)##plotting
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(scales)
+library(modelbased)
+
+
+#fonts
+library(extrafont)
+#font_import()
+loadfonts(device = "win")
+
+
+
+##analyses packages
+library(lmerTest)
+library(lme4)
+
+
+options(scipen=1, digits=3)
+
+```
+
+```{r}
+#merging the files
+
+noun1A<-read.csv("exp1Aformerge.csv", header=TRUE, stringsAsFactors = FALSE)
+noun1A$experiment<-"1A"
+
+
+
+noun1B<-read.csv("exp1Bformerge.csv", header=TRUE, stringsAsFactors = FALSE)
+noun1B$experiment<-"1B"
+
+allExpNoun<-rbind(noun1A, noun1B)
+names(allExpNoun)[names(allExpNoun)=="ï..subject"]<-"subject"
+
+summary(allExpNoun)
+
+sampleSizeExp1<-ddply(allExpNoun, .(condition,experiment), summarize, NumSubjects = length(unique(subject)))
+
+```
+
+##NOUN NOT NOUN TASK
+
+```{r}
+
+#add accuracy
+
+allExpNoun$accuracy[allExpNoun$grammarType == allExpNoun$nounAnswer2]<-1
+allExpNoun$accuracy[!allExpNoun$grammarType == allExpNoun$nounAnswer2]<-0
+
+
+##performance, plot
+aggregate(accuracy~wordType+condition, allExpNoun, FUN="mean")
+
+nnnMean_final<- aggregate(accuracy~wordType+condition+experiment,allExpNoun, FUN="mean")
+
+nnnSD_final<- aggregate(accuracy~wordType+condition+experiment,allExpNoun, FUN="sd")
+nnnMean_final$sd<-nnnSD_final$accuracy
+
+nnnMean_final<-merge(sampleSizeExp1, nnnMean_final)
+
+nnnMean_final$sem<-nnnMean_final$sd/sqrt(nnnMean_final$NumSubjects)
+
+nnnMean_final$max<-nnnMean_final$accuracy+nnnMean_final$sem
+nnnMean_final$min<-nnnMean_final$accuracy-nnnMean_final$sem
+
+
+nnnMean_final$condition[nnnMean_final$condition == "aam"]<-"Early Ambiguous"
+nnnMean_final$condition[nnnMean_final$condition == "bam"]<-"Late Ambiguous"
+nnnMean_final$condition[nnnMean_final$condition == "abm"]<-"Early Bad Map"
+nnnMean_final$condition[nnnMean_final$condition == "bbm"]<-"Late Bad Map"
+
+nnnMean_final$experiment[nnnMean_final$experiment=="1A"]<-"Experiment 1a"
+nnnMean_final$experiment[nnnMean_final$experiment=="1B"]<-"Experiment 1b"
+
+
+png("nounExp1.png", units="in", width=12, height=6, res=300)
+
+
+ggplot(nnnMean_final, aes(wordType, accuracy))+
+  geom_bar(stat = "identity", position="dodge", aes(fill=condition))+
+ geom_errorbar(aes(ymin=min, ymax=max, shape=condition), width=.2,size=1, position=position_dodge(.9))+
+  scale_fill_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
+    scale_shape_discrete(labels=c("Early Ambiguous","Early Bad Map", "Late Ambiguous", "Late Bad Map"))+
+  theme_classic(base_size = 14)+
+  theme(plot.margin = unit(c(1,3,1,1),"lines"),
+  text = element_text(family="Times New Roman"),
+  legend.position="right",
+  axis.text.x = element_text(size=12),
+  axis.text.y = element_text(size=12),
+  plot.title = element_text(size=12))+
+  ylab("Accuracy")+
+  xlab("Item Type")+
+  facet_wrap(~experiment)+
+  ylim(0,1)
+
+dev.off()
+
+#    scale_color_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#001f23","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Baseline","Late Bad Map"))+
+
+
+```
+
+
+
+```{r}
+accuracyNNNallexps_model<-glmer(accuracy~condition*experiment+wordType+grammarType+scale(trial)+(1|word)+(1+wordType|subject), family = "binomial", allExpNoun, glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(accuracyNNNallexps_model)
+
+accuracyNNNallexps_model2<-glmer(accuracy~condition+experiment+wordType+grammarType+scale(trial)+(1|word)+(1+wordType|subject), family = "binomial", allExpNoun, glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(accuracyNNNallexps_model2)
+
+
+anova(accuracyNNNallexps_model, accuracyNNNallexps_model2)
+
+
+accuracyNNNallexps_model3<-glmer(accuracy~condition+wordType+grammarType+scale(trial)+(1|word)+(1+wordType|subject), family = "binomial", allExpNoun, glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+anova(accuracyNNNallexps_model2, accuracyNNNallexps_model3)
+
+```
+
+
+##ID task
+
+```{r}
+#merging the files
+
+id1A<-read.csv("exp1AIDformerge.csv", header=TRUE, stringsAsFactors = FALSE)
+id1A$experiment<-"1A"
+
+
+
+id1B<-read.csv("exp1BIDformerge.csv", header=TRUE, stringsAsFactors = FALSE)
+id1B$experiment<-"1B"
+
+allExpID<-rbind(id1A, id1B)
+names(allExpID)[names(allExpID)=="ï..subject"]<-"subject"
+
+summary(allExpID)
+
+sampleSizeExp2<-ddply(allExpID, .(condition,experiment), summarize, NumSubjects = length(unique(subject)))
+
+```
+
+
+```{r}
+
+##cleaning up data
+allExpID$step[allExpID$step %in% c("5","17")]<-NA
+allExpID<-na.omit(allExpID)
+allExpID$step_centered<-allExpID$step
+allExpID$step_centered<-rescale(allExpID$step_centered, to = c(-0.5, 0.5))
+allExpID$condition<-factor(allExpID$condition)
+
+##first 5 reps only
+idres_allexp_early<-allExpID[allExpID$pass <6,]
+
+idres_allexp_early <- idres_allexp_early %>%
+  mutate(condition = relevel(condition, ref = "baseline"))
+
+
+id_allexp_model<-glmer(sAnswer~condition*experiment+step_centered+scale(trial)+(1|subject),family="binomial",idres_allexp_early,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(id_allexp_model)
+
+id_allexp_model2<-glmer(sAnswer~condition+experiment+step_centered+scale(trial)+(1|subject),family="binomial",idres_allexp_early,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+anova(id_allexp_model,id_allexp_model2)
+
+summary(id_allexp_model2)
+
+id_allexp_model3<-glmer(sAnswer~condition+step_centered+scale(trial)+(1|subject),family="binomial",idres_allexp_early,glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(id_allexp_model3)
+
+anova(id_allexp_model2, id_allexp_model3)
+
+aggregate(sAnswer ~ condition, idres_allexp_early, FUN="mean")
+
+
+```
+
