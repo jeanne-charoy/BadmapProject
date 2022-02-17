@@ -59,14 +59,14 @@ sampleSize<-ddply(idTask_OnlineGdFinal, .(condition), summarize, NumSubjects = l
 
 ```{r, echo=FALSE}
 
-nnnMean_final<- aggregate(nounAnswer~wordType+subject+condition,nounTask_OnlineGdFinal, FUN="mean")
-nnnMean_final_group<- aggregate(nounAnswer~wordType+condition,nounTask_OnlineGdFinal, FUN="mean")
+nnnMean_final<- aggregate(nounAnswer~grammarType+subject+condition,nounTask_OnlineGdFinal, FUN="mean")
+nnnMean_final_group<- aggregate(nounAnswer~grammarType+condition,nounTask_OnlineGdFinal, FUN="mean")
 
 
-ggplot(nnnMean_final_group, aes(wordType, nounAnswer))+
+ggplot(nnnMean_final_group, aes(grammarType, nounAnswer))+
   geom_bar(stat = "identity", position="dodge", aes(fill=condition))+
 #  geom_errorbar(aes(ymin=Button.Pressed-sem, ymax=Button.Pressed+sem, shape=Condition), width=.2,size=1, position=position_dodge(.9))+
-  geom_point(data = nnnMean_final, position =position_jitterdodge(jitter.width = 0,jitter.height = 0,dodge.width = .9), aes(x = wordType, y = nounAnswer, shape = condition),alpha=.3, size=2)+
+  geom_point(data = nnnMean_final, position =position_jitterdodge(jitter.width = 0,jitter.height = 0,dodge.width = .9), aes(x = grammarType, y = nounAnswer, shape = condition),alpha=.3, size=2)+
   scale_fill_manual(values=c("#005a9c","#bf2c37","#008061","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
     scale_shape_discrete(labels=c("Early Ambiguous","Early Bad Map", "Late Ambiguous", "Late Bad Map"))+
   ylab("Percent 'NOUN' answer")+
@@ -165,6 +165,9 @@ ggplot(idAverageERL, aes(step, SAnswer))+
   facet_wrap(~conditionType)
 
 dev.off()
+
+
+aggregate(SAnswer~condition, idTask_OnlineGdFinalEARLY, FUN="mean")
 
 ```
 

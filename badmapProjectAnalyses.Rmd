@@ -46,6 +46,7 @@ nounTask<-read.csv("exp1A_Nountask_masterFile.csv", header=TRUE, stringsAsFactor
 ddply(nounTask, .(Condition), summarize, NumSubjects = length(unique(Subject)))
 
 
+
 idTask<-read.csv("exp1A_idtask_masterFile.csv", header=TRUE, stringsAsFactors = FALSE)
 
 ddply(idTask, .(condition), summarize, NumSubjects = length(unique(subject)))
@@ -54,6 +55,19 @@ ddply(idTask, .(condition), summarize, NumSubjects = length(unique(subject)))
 
 
 #Data cleaning (eliminating outliers/bad performance participants)
+
+```{r}
+##trials that don't make sense
+
+##eliminating trials where RTs were higher than 5000ms or lower than 200ms
+nounTask<-nounTask[!nounTask$rt > 5000,]
+nounTask<-nounTask[!nounTask$rt <200,]
+
+idTask<-idTask[!idTask$rt > 5000,]
+idTask<-idTask[!idTask$rt < 200,]
+```
+
+
 
 ##Noun task performance
 ```{r}
@@ -167,12 +181,8 @@ sampleSize_NT<-ddply(nounTask_good, .(Condition), summarize, NumSubjects = lengt
 idTask_good<-idTask[!idTask$subject %in% badSubjAll,]
 sampleSize_ID<-ddply(idTask_good, .(condition), summarize, NumSubjects = length(unique(subject)))
 
-##eliminating trials where RTs were higher than 5000ms or lower than 200ms
-nounTask_good<-nounTask_good[!nounTask_good$rt > 5000,]
-nounTask_good<-nounTask_good[!nounTask_good$rt <200,]
 
-idTask_good<-idTask_good[!idTask_good$rt > 5000,]
-idTask_good<-idTask_good[!idTask_good$rt < 200,]
+#aggregate(sAnswer ~ condition, idTask_good, FUN="mean")
 
 #write.csv(idTask_good, file="idResultsGood.csv")
 #write.csv(nounTask_good, file="nounResultsGood.csv")

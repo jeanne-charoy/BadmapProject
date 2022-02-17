@@ -1,4 +1,4 @@
-subject,condition,word,step,SAnswer,rt,trial,pass,phase
+subject,condition,word,step,sAnswer,rt,trial,pass,phase
 Subject001,bam,asee_shstep7.wav,7,1,1219,58,8,Late
 Subject001,bam,asee_shstep7.wav,7,1,1277,37,5,Early
 Subject001,bam,asee_shstep7.wav,7,1,910,40,6,Late

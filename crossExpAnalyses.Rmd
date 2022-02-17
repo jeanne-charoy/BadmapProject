@@ -37,12 +37,13 @@ options(scipen=1, digits=3)
 ```{r}
 #merging the files
 
-noun1A<-read.csv("exp1Aformerge.csv", header=TRUE, stringsAsFactors = FALSE)
+noun1A<-read.csv("exp1Aformerge.csv", header=TRUE, stringsAsFactors = FALSE,fileEncoding = "UTF-8-BOM")
+names(noun1A[,1])<-"subject"
 noun1A$experiment<-"1A"
 
 
 
-noun1B<-read.csv("exp1Bformerge.csv", header=TRUE, stringsAsFactors = FALSE)
+noun1B<-read.csv("exp1Bformerge.csv", header=TRUE, stringsAsFactors = FALSE, fileEncoding = "UTF-8-BOM")
 noun1B$experiment<-"1B"
 
 allExpNoun<-rbind(noun1A, noun1B)
@@ -54,6 +55,16 @@ sampleSizeExp1<-ddply(allExpNoun, .(condition,experiment), summarize, NumSubject
 
 ```
 
+##Checking that the means fit with the solo dataset analyses (sanity check)   
+
+```{r}
+
+aggregate(nounAnswer~experiment, allExpNoun, FUN = "mean") ## ok I do get the same mean
+
+ddply(allExpNoun, .(grammarType,condition,experiment), summarize, NumSubjects = length(unique(word)))
+```
+
+
 ##NOUN NOT NOUN TASK
 
 ```{r}
@@ -63,9 +74,16 @@ sampleSizeExp1<-ddply(allExpNoun, .(condition,experiment), summarize, NumSubject
 allExpNoun$accuracy[allExpNoun$grammarType == allExpNoun$nounAnswer2]<-1
 allExpNoun$accuracy[!allExpNoun$grammarType == allExpNoun$nounAnswer2]<-0
 
+##averages
+
+aggregate(accuracy~ grammarType+experiment,allExpNoun, FUN="mean")
+
+
+
+
 
 ##performance, plot
-aggregate(accuracy~wordType+condition, allExpNoun, FUN="mean")
+#aggregate(accuracy~wordType+condition, allExpNoun, FUN="mean")
 
 nnnMean_final<- aggregate(accuracy~wordType+condition+experiment,allExpNoun, FUN="mean")
 
@@ -85,17 +103,17 @@ nnnMean_final$condition[nnnMean_final$condition == "bam"]<-"Late Ambiguous"
 nnnMean_final$condition[nnnMean_final$condition == "abm"]<-"Early Bad Map"
 nnnMean_final$condition[nnnMean_final$condition == "bbm"]<-"Late Bad Map"
 
-nnnMean_final$experiment[nnnMean_final$experiment=="1A"]<-"Experiment 1a"
-nnnMean_final$experiment[nnnMean_final$experiment=="1B"]<-"Experiment 1b"
+nnnMean_final$experiment[nnnMean_final$experiment=="1A"]<-"In lab"
+nnnMean_final$experiment[nnnMean_final$experiment=="1B"]<-"Online"
 
 
-png("nounExp1.png", units="in", width=12, height=6, res=300)
+#png("nounExp1.png", units="in", width=12, height=6, res=300)
 
 
 ggplot(nnnMean_final, aes(wordType, accuracy))+
   geom_bar(stat = "identity", position="dodge", aes(fill=condition))+
  geom_errorbar(aes(ymin=min, ymax=max, shape=condition), width=.2,size=1, position=position_dodge(.9))+
-  scale_fill_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
+  scale_fill_manual(values=c("#94D2BD","#005F73","#CA6702","#9B2226"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
     scale_shape_discrete(labels=c("Early Ambiguous","Early Bad Map", "Late Ambiguous", "Late Bad Map"))+
   theme_classic(base_size = 14)+
   theme(plot.margin = unit(c(1,3,1,1),"lines"),
@@ -107,9 +125,10 @@ ggplot(nnnMean_final, aes(wordType, accuracy))+
   ylab("Accuracy")+
   xlab("Item Type")+
   facet_wrap(~experiment)+
-  ylim(0,1)
+  ylim(0,1)+
+  guides(fill=guide_legend(title="Condition"))
 
-dev.off()
+#dev.off()
 
 #    scale_color_manual(values=c("#005a9c","#bf2c37","#A5FFD6","#001f23","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Baseline","Late Bad Map"))+
 
@@ -143,22 +162,109 @@ anova(accuracyNNNallexps_model2, accuracyNNNallexps_model3)
 ```{r}
 #merging the files
 
-id1A<-read.csv("exp1AIDformerge.csv", header=TRUE, stringsAsFactors = FALSE)
-id1A$experiment<-"1A"
+id1A<-read.csv("exp1AIDformerge.csv", header=TRUE, stringsAsFactors = FALSE,fileEncoding = "UTF-8-BOM")
+id1A$experiment<-"In lab"
 
 
 
-id1B<-read.csv("exp1BIDformerge.csv", header=TRUE, stringsAsFactors = FALSE)
-id1B$experiment<-"1B"
+id1B<-read.csv("exp1BIDformerge.csv", header=TRUE, stringsAsFactors = FALSE,fileEncoding = "UTF-8-BOM")
+id1B$experiment<-"Online"
 
 allExpID<-rbind(id1A, id1B)
-names(allExpID)[names(allExpID)=="ï..subject"]<-"subject"
 
 summary(allExpID)
 
 sampleSizeExp2<-ddply(allExpID, .(condition,experiment), summarize, NumSubjects = length(unique(subject)))
 
 ```
+##sanity check with the solo data sets
+
+```{r}
+aggregate(sAnswer~condition, allExpID[allExpID$experiment == "Online",], FUN="mean")##all good
+
+
+```
+
+##selecting only the early trials (for analysis)
+
+```{r}
+allExpID_early<-allExpID[allExpID$pass <6,]
+
+SHres <- aggregate(sAnswer~step+condition+experiment, allExpID_early, FUN="mean")
+
+SHres_sd<-aggregate(sAnswer~step+condition+experiment, allExpID_early, FUN="sd")
+
+SHres$sd<-SHres_sd$sAnswer
+
+idAverage<-merge(sampleSizeExp2, SHres)
+
+idAverage$sem<-idAverage$sd/sqrt(idAverage$NumSubjects)
+
+idAverage$conditionType[idAverage$condition %in% c("aam","bam", "baseline")]<-"Ambiguous Conditions"
+idAverage$conditionType[idAverage$condition %in% c("abm","bbm")]<-"Bad Map Conditions"
+
+idAverage$condition<-factor(idAverage$condition)
+
+# Ou spécifiez les niveaux de facteur dans l'ordre que vous voulez
+idAverage$condition <- factor(idAverage$condition, levels = c("bam", "aam", "bbm","abm","baseline"))
+
+idAverage$step<-factor(idAverage$step)
+
+
+##ambiguous conditions first
+
+#png("Exp1Online2Ambig.png", units="in", width=12, height=6, res=300)
+
+
+ggplot(idAverage[idAverage$conditionType == "Ambiguous Conditions",], aes(step, sAnswer))+
+  geom_line(aes(color=condition, group = condition), size=1)+
+      geom_errorbar(data=idAverage[idAverage$conditionType == "Ambiguous Conditions",],aes(ymin=sAnswer-sem,ymax=sAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
+  ylab("Percent 'S' answer")+
+  xlab("Steps (from more S to more SH)")+
+   scale_color_manual(values=c("#CA6702","#94D2BD","#001219"),labels=c("Late Ambiguous","Early Ambiguous","Baseline"))+
+  #  scale_color_manual(values=c("#9B2226","#005F73","#001219"),labels=c("Late Bad Map","Early Bad Map", "Baseline"))+
+      theme_minimal(base_size = 14)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        plot.title = element_text(size=12),
+        text = element_text(family="Times New Roman"))+
+        guides(linetype=FALSE)+
+        facet_wrap(~experiment)
+
+#dev.off()
+
+
+#aggregate(sAnswer~condition, allExpID_early, FUN="mean")
+```
+
+##Looking at RTs just in case   
+
+```{r}
+allExpID_early
+
+rts<-aggregate(rt~step+experiment+condition, allExpID_early, FUN="mean")
+
+ggplot(rts, aes(step, rt))+
+  geom_bar(stat="identity", position="dodge", aes(fill=condition), size=1)+
+#      geom_errorbar(data=idAverage,aes(ymin=sAnswer-sem,ymax=sAnswer+sem), width=.2,size=1,alpha=0.3, position=position_dodge(.9))+
+      theme_minimal(base_size = 14)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        plot.title = element_text(size=12),
+        text = element_text(family="Times New Roman"))+
+        guides(linetype=FALSE)+
+        facet_wrap(condition~experiment)
+
+
+```
+
+
 
 
 ```{r}
@@ -170,8 +276,30 @@ allExpID$step_centered<-allExpID$step
 allExpID$step_centered<-rescale(allExpID$step_centered, to = c(-0.5, 0.5))
 allExpID$condition<-factor(allExpID$condition)
 
+allExpID$step<-as.integer(allExpID$step)
+
+allExpID <- allExpID %>%
+  mutate(condition = relevel(condition, ref = "baseline"))
+
+
+##in lab
+modLab<-glmer(sAnswer~condition+step_centered+scale(trial)+(1+step|subject),family="binomial",allExpID[allExpID$experiment == "In lab",],glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+summary(modLab)
+
+##online
+
+modOnline<-glmer(sAnswer~condition+step_centered+scale(trial)+(1+step|subject),family="binomial",allExpID[allExpID$experiment == "Online",],glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+summary(modOnline)
+```
+
+
+```{r}
+
 ##first 5 reps only
 idres_allexp_early<-allExpID[allExpID$pass <6,]
+
+aggregate(sAnswer ~ condition, idres_allexp_early, FUN="mean")
+
 
 idres_allexp_early <- idres_allexp_early %>%
   mutate(condition = relevel(condition, ref = "baseline"))
@@ -193,8 +321,251 @@ summary(id_allexp_model3)
 
 anova(id_allexp_model2, id_allexp_model3)
 
-aggregate(sAnswer ~ condition, idres_allexp_early, FUN="mean")
+aggregate(sAnswer ~ condition+experiment, allExpID, FUN="mean")
+
+
+
+ddply(allExpID, .(condition, experiment), summarize, NumSubjects = length(unique(subject)))
+```
+
+##in lab
+
+```{r}
+id_allexp_inlab<-glmer(sAnswer~condition+step_centered+scale(trial)+(1+step|subject),family="binomial",idres_allexp_early[idres_allexp_early$experiment == "In lab",],glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(id_allexp_inlab)
+
+earlyLab<-idres_allexp_early[idres_allexp_early$experiment == "In lab",]
+mean(earlyLab$sAnswer[earlyLab$condition == "bam"])
+mean(earlyLab$sAnswer[earlyLab$condition == "baseline"])
+
+```
+
+##online
+
+```{r}
+id_allexp_online<-glmer(sAnswer~condition+step_centered+scale(trial)+(1+step|subject),family="binomial",idres_allexp_early[idres_allexp_early$experiment == "Online",],glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(id_allexp_online)
+```
+
+### Trying with difference scores to the baseline (i.e., the shift)
+
+```{r}
+idres_allexp_early
+
+meanBaseline <- aggregate(sAnswer ~ step+experiment, allExpID_early[allExpID_early$condition == "baseline",],  FUN="mean")
+names(meanBaseline)<- c("step","experiment","meanBase")
+
+meanSteps_bySubj<- aggregate(sAnswer ~step+condition+subject+experiment, allExpID_early[!allExpID_early$condition == "baseline",], FUN="mean")
+
+diffScore_df<-merge(meanBaseline, meanSteps_bySubj)
+
+
+diffScore_df$diffScore <- diffScore_df$sAnswer - diffScore_df$meanBase
+
+```
+
+
+```{r}
+ggplot(diffScore_df, aes(step, diffScore))+
+  geom_point(aes(color=subject),show.legend = FALSE)+
+  facet_wrap(~experiment+condition)
+
+
+ggplot(diffScore_df[diffScore_df$experiment == "Online",], aes(step, diffScore))+
+  geom_point(aes(color=subject),position =position_jitterdodge(jitter.width = 0,jitter.height = 0,dodge.width = .9),show.legend = FALSE)+
+  facet_wrap(~condition)
+
+
+ggplot(diffScore_df, aes(step, diffScore))+
+  geom_line(aes(color=subject),show.legend = FALSE)+
+  facet_wrap(~experiment+condition)
+
+  
+```
+
+```{r}
+meanDiffScore<-aggregate(diffScore ~ condition+experiment+step, diffScore_df, FUN="mean")
+sdDiffScore<-aggregate(diffScore~step+condition+experiment, diffScore_df, FUN="sd")
+
+
+aggregate(diffScore ~ condition+experiment, diffScore_df, FUN="mean")
+
+
+meanDiffScore$sd<-sdDiffScore$diffScore
+
+diffScore_avg<-merge(sampleSizeExp2, meanDiffScore)
+
+diffScore_avg$sem<-diffScore_avg$sd/sqrt(diffScore_avg$NumSubjects)
+
+pd = position_dodge(width=0.6)
+ggplot(diffScore_avg, aes(step, diffScore, color=condition))+
+  geom_line(position = pd)+
+  geom_errorbar(aes(ymin=diffScore-sem,ymax=diffScore+sem),position=pd, width=.2, alpha=0.5)+
+  geom_point(position = pd)+
+  facet_wrap(~experiment)+
+  ylim(-0.10, 0.25)+
+  ylab("difference score between experimental condition and baseline")+
+  scale_color_manual(values=c("#94D2BD","#005F73","#CA6702","#9B2226"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
+   geom_hline(yintercept=0, linetype="dashed", 
+                color = "red")+
+        theme_minimal(base_size = 14)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        plot.title = element_text(size=12),
+        text = element_text(family="Times New Roman"))
+
+
+
+
+  #  scale_color_manual(values=c("#001219"),labels=c( "Baseline"))+
+ # scale_colour_discrete(labels=c("Early Ambiguous","Early Bad Map", "Late Ambiguous", "Late Bad Map"))
+
+```
+
+```{r}
+
+cond.labs <- c("Early Ambiguous", "Late Ambiguous", "Early Bad Map", "Late Bad Map")
+names(cond.labs) <- c("aam", "bam", "abm","bbm")
+
+# Ou spécifiez les niveaux de facteur dans l'ordre que vous voulez
+diffScore_avg$condition <- factor(diffScore_avg$condition, levels = c("bam", "aam", "bbm","abm"))
+
+pd = position_dodge(width=0.6)
+
+
+png("diffScore.png", units="in", width=12, height=6, res=300)
+
+ggplot(diffScore_avg, aes(step, diffScore, color=experiment))+
+  geom_line(position = pd, size=1)+
+  geom_errorbar(aes(ymin=diffScore-sem,ymax=diffScore+sem),position=pd, width=.2)+
+  geom_point(position = pd)+
+  facet_wrap(~condition, labeller = labeller(condition = cond.labs))+
+  ylim(-0.10, 0.25)+
+  geom_hline(yintercept=0, linetype="dashed", 
+                color = "black")+
+          theme_minimal(base_size = 14)+
+    theme(plot.margin = unit(c(1,3,1,1),"lines"),
+        legend.position="right",
+        legend.title=element_blank(),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        plot.title = element_text(size=12),
+        text = element_text(family="Times New Roman"))+
+    scale_color_manual(values=c("#E28413","#54325D"),labels=c("In lab experiment","Online experiment"))+
+    scale_x_continuous(breaks=c(5,7,9, 11, 13,15,17),label = c("5","7", "9", "11","13","15", "17"))+
+    ylab("Recalibration shift")+
+    xlab("Continuum Step")
+
+dev.off()
+
+```
+
+
+####analyses of the difference scores 
+
+```{r}
+#distrib of the diff score
+
+hist(diffScore_df$diffScore)
+```
+
+
+```{r}
+#factors: condition, experiment, the interaction, step
+#random: subject, 
+
+diffScore_df$step_centered<-rescale(diffScore_df$step, to = c(-0.5, 0.5))
+diffScore_df$condition<-as.factor(diffScore_df$condition)
+diffScore_df$experiment<-as.factor(diffScore_df$experiment)
+
+
+diffScore_df <- diffScore_df %>%
+  mutate(condition = relevel(condition, ref = "bam"))
+
+mod1_diff<- lmer(diffScore ~ condition * experiment + step_centered + (1|subject), diffScore_df)
+
+summary(mod1_diff)
+
+
+mod1_diff2<- lmer(diffScore ~ condition + experiment + step_centered + (1|subject), diffScore_df)
+
+anova(mod1_diff,mod1_diff2)
 
 
 ```
 
+
+
+#################################################################################################################################
+#################################################ADDITIONAL ANALYSES#############################################################
+#################################################################################################################################
+
+
+```{r}
+
+#full data set
+
+allExpID
+
+
+allExpID <- allExpID %>%
+  mutate(condition = relevel(condition, ref = "baseline"))
+
+id_allexp_modelALLDATA<-glmer(sAnswer~condition+step_centered+scale(trial)+(1+step|subject),family="binomial",allExpID[allExpID$experiment == "Online",],glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(id_allexp_modelALLDATA)
+```
+
+```{r}
+
+##last five reps
+allExpID_lastFive<-allExpID[allExpID$pass>=6,]
+
+aggregate(sAnswer ~ condition+experiment, allExpID_lastFive, FUN="mean")
+
+allExpID_lastFive$condition<-as.factor(allExpID_lastFive$condition)
+
+allExpID_lastFive <- allExpID_lastFive %>%
+  mutate(condition = relevel(condition, ref = "baseline"))
+
+id_allexp_modelLastFive<-glmer(sAnswer~condition+step_centered+scale(trial)+(1|subject),family="binomial",allExpID_lastFive[allExpID_lastFive$experiment == "Online",],glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(id_allexp_modelLastFive)
+```
+
+##Interaction analyses
+```{r}
+
+idres_allexp_early$pronunciation[idres_allexp_early$condition %in% c("aam","bam")]<-"ambiguous"
+idres_allexp_early$pronunciation[idres_allexp_early$condition %in% c("abm","bbm")]<-"badmap"
+idres_allexp_early$pronunciation[idres_allexp_early$condition %in% c("baseline")]<-"none"
+
+idres_allexp_early$pronunciation<-as.factor(idres_allexp_early$pronunciation)
+
+idres_allexp_early$position[idres_allexp_early$condition %in% c("aam","abm")]<-"early"
+idres_allexp_early$position[idres_allexp_early$condition %in% c("bam","bbm")]<-"late"
+idres_allexp_early$position[idres_allexp_early$condition %in% c("baseline")]<-"none"
+
+
+idres_allexp_early <- idres_allexp_early %>%
+  mutate(pronunciation = relevel(pronunciation, ref = "none"))
+
+idres_allexp_early$position<-as.factor(idres_allexp_early$position)
+
+
+idres_allexp_early <- idres_allexp_early %>%
+  mutate(position = relevel(position, ref = "late"))
+
+
+
+modelInteraction<-glmer(sAnswer~pronunciation*position+step_centered+scale(trial)+(1+step|subject),family="binomial",idres_allexp_early[idres_allexp_early$experiment == "In lab",],glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+summary(modelInteraction)
+
+
+```

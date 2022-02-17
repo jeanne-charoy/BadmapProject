@@ -50,6 +50,15 @@ allIDtaskres<-(rbind(idTask_Online, baselineTask_Online))
 ddply(allIDtaskres, .(condition), summarize, NumSubjects = length(unique(subject)))
 
 ```
+#eliminating trials that don't make sense (RTs > 5000ms or <200ms)
+```{r}
+##eliminating trials where RTs were higher than 5000ms or lower than 200ms
+nounTask_Online<-nounTask_Online[!nounTask_Online$rt > 5000,]
+nounTask_Online<-nounTask_Online[!nounTask_Online$rt <200,]
+
+allIDtaskres<-allIDtaskres[!allIDtaskres$rt > 5000,]
+allIDtaskres<-allIDtaskres[!allIDtaskres$rt < 200,]
+```
 
 
 ##First going through the exclusion criteria based on characteristics of the participants (language background, audio equipment etc...)
@@ -120,8 +129,8 @@ badNotNoun_subj<-as.character(nnn_MeanNotNoun$subject[nnn_MeanNotNoun$nounAnswer
 
 ##based on RTs.  
 
-nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt >5000,]
-nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt <200,]
+#nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt >5000,]
+#nounTask_OnlineGd1<-nounTask_OnlineGd1[!nounTask_OnlineGd1$rt <200,]
 
 
 nnnMean_RT<-aggregate(rt~grammarType+subject+condition, nounTask_OnlineGd1, FUN="mean" )
@@ -178,14 +187,14 @@ goodIDcalcDiff<-spread(goodIDcalc, step, SAnswer, fill = 0) %>%
 
 badSubjectIDT <- goodIDcalcDiff$subject[goodIDcalcDiff$Diff <= 0.5]
 
-exp1ID_step1<-idTask_OnlineGd1[idTask_OnlineGd1$step == "step05",]
-exp1ID_step1Mean<-aggregate(SAnswer~subject, exp1ID_step1, FUN="mean")
-exp1ID_step1_badsubj<-exp1ID_step1Mean$subject[exp1ID_step1Mean$SAnswer<=0.70]
+#exp1ID_step1<-idTask_OnlineGd1[idTask_OnlineGd1$step == "step05",]
+#exp1ID_step1Mean<-aggregate(SAnswer~subject, exp1ID_step1, FUN="mean")
+#exp1ID_step1_badsubj<-exp1ID_step1Mean$subject[exp1ID_step1Mean$SAnswer<=0.50]
 
 
 ##Rts
-idTask_OnlineGd1<-idTask_OnlineGd1[!idTask_OnlineGd1$rt>5000,]
-idTask_OnlineGd1<-idTask_OnlineGd1[!idTask_OnlineGd1$rt<200,]
+#idTask_OnlineGd1<-idTask_OnlineGd1[!idTask_OnlineGd1$rt>5000,]
+#idTask_OnlineGd1<-idTask_OnlineGd1[!idTask_OnlineGd1$rt<200,]
 
 
 idMeanRT<-aggregate(rt~subject+condition, idTask_OnlineGd1, FUN="mean" )
@@ -203,8 +212,9 @@ idMeanRT<-merge(idMeanRT, idMeanRTAll)
 
 idbadsubjectRT<-idMeanRT$subject[idMeanRT$rt>idMeanRT$thresholdmax] ## one subject
 
-badSubjectID<-c(badSubjectIDT,exp1ID_step1_badsubj, idbadsubjectRT)
-##also eliminating people who answer S less than 50% of teh time on step05 (i.e. the first step)
+badSubjectID<-unique(c(badSubjectIDT, idbadsubjectRT))
+
+length(badSubjectID)
 
 ```
 
@@ -217,18 +227,32 @@ badSubjectExp1Online<-unique(c(badSubjectNountask,badSubjectID))
 
 length(badSubjectExp1Online)
 
+
+```
+
+```{r}
+#cleaned up data sets: 
+
 nounTask_OnlineGdFinal<-nounTask_OnlineGd1[!nounTask_OnlineGd1$subject %in% badSubjectExp1Online,]
+
 idTask_OnlineGdFinal<-idTask_OnlineGd1[!idTask_OnlineGd1$subject %in% badSubjectExp1Online,]
+sampleSizeOnline<-ddply(idTask_OnlineGdFinal, .(condition), summarize, NumSubjects = length(unique(subject)))
+
+
+
+
+
+
 
 
 ddply(nounTask_OnlineGdFinal, .(condition), summarize, NumSubjects = length(unique(subject)))
 
-sampleSizeOnline<-ddply(idTask_OnlineGdFinal, .(condition), summarize, NumSubjects = length(unique(subject)))
 
 
 #write.csv(idTask_OnlineGdFinal, file="idOnlineResultsGood.csv")
 #write.csv(nounTask_OnlineGdFinal, file="nounOnlineResultsGood.csv")
 ```
+
 
 #MEAN,PLOTS AND ANALYSES OF THE NOUN TASK RESULTS
 
@@ -262,10 +286,13 @@ mean(nounTask_OnlineGdFinal$accuracy)
 
 
 ```{r}
+
+means_bySubj<-aggregate(accuracy~grammarType+subject, nounTask_OnlineGdFinal, FUN="mean")
 #plot
 ggplot(nounTaskOnlinegd_mean, aes(grammarType, accuracy))+
   geom_bar(stat = "identity", position="dodge", aes(fill=condition))+
-  geom_errorbar(aes(ymin=accuracy-sem, ymax=accuracy+sem, shape=condition), width=.2,size=1, position=position_dodge(.9))+
+  geom_point(data=means_bySubj, aes(grammarType, accuracy))+
+#  geom_errorbar(aes(ymin=accuracy-sem, ymax=accuracy+sem, shape=condition), width=.2,size=1, position=position_dodge(.9))+
   scale_fill_manual(values=c("#005a9c","#bf2c37","#008061","#b9ae35"),labels=c("Early Ambiguous","Early Bad Map","Late Ambiguous","Late Bad Map"))+
     scale_shape_discrete(labels=c("Early Ambiguous","Early Bad Map", "Late Ambiguous", "Late Bad Map"))+
   ylab("Accuracy")+
